@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tableau Blanc IA</title>
+  <link rel="stylesheet" href="style.css?v=20261029o">
+  <script src="assets-integres.js?v=20261029o"></script>
+  <script src="mp4-muxer.js?v=20261029o"></script>
+  <script src="voix.js?v=20261029o"></script>
+  <script src="son-feutre.js?v=20261029o"></script>
+  <script src="banque-feutre.js?v=20261029o"></script>
+  <script src="vectoriseur.js?v=20261029o"></script>
+  <script src="moteur.js?v=20261029o"></script>
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-icon">T</div>
+      <div>
+        <h1 class="brand-title">Tableau Blanc IA</h1>
+      </div>
+      <span class="brand-badge">Gratuit · tout reste sur votre ordinateur</span>
+    </div>
+    <div class="header-actions">
+      <span class="badge-info">Sans compte · sans filigrane · sans publicité</span>
+      <label class="btn-entete" title="Reprendre un projet enregistré (.tableau.json)">
+        Ouvrir un projet
+        <input type="file" id="inputProjet" accept=".json,application/json" hidden>
+      </label>
+      <button class="btn-entete" id="btnEnregistrerProjet" onclick="enregistrerProjet()" title="Dessins, voix et réglages dans un seul fichier">Enregistrer le projet</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="main-grid">
+      
+      <!-- Colonne Paramètres & Fichiers -->
+      <aside class="sidebar">
+
+        <!-- Mode de travail : Multi-Scènes ou Continu -->
+        <div class="card">
+          <div class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Mode de Tracé
+          </div>
+          <div class="mode-tabs">
+            <button class="mode-tab active" id="tabScenes" onclick="changerMode('scenes')">Scènes successives</button>
+            <button class="mode-tab" id="tabContinu" onclick="changerMode('continu')">Tableau unique (continu)</button>
+          </div>
+        </div>
+
+        <!-- 1. Import Images -->
+        <div class="card">
+          <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            1. Dessins & Images
+          </h2>
+          <div class="drop-zone" id="dropImage">
+            <input type="file" id="inputImage" accept="image/png, image/jpeg, image/webp, image/svg+xml, .svg" multiple>
+            <strong>Glissez vos dessins ici</strong>
+            <div class="drop-hint" id="dropHintText">Une image par scène (PNG, JPG, WebP ou SVG), dans l'ordre de leur nom. Une seule image avec plusieurs scènes côte à côte est découpée toute seule.</div>
+            <span class="file-status" id="statusImage" style="color: var(--text-muted);">Aucune image</span>
+          </div>
+          <div class="audio-actions">
+            <button type="button" class="btn-audio-action" id="btnImageEntiere" onclick="garderImageEntiere()" style="display: none;" title="Annuler le découpage : une seule scène avec toute l'image">Garder l'image entière</button>
+          </div>
+        </div>
+
+        <!-- 2. Fichier Audio -->
+        <div class="card">
+          <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            2. Voix / Narration
+          </h2>
+          <div class="drop-zone" id="dropAudio">
+            <input type="file" id="inputAudio" accept="audio/*,.wav,.mp3,.m4a">
+            <strong>Glissez la voix ici</strong>
+            <div class="drop-hint">WAV, MP3 ou M4A — facultatif. Les scènes se calent toutes seules sur les phrases.</div>
+            <span class="file-status" id="statusAudio" style="color: var(--text-muted);">Aucune voix (facultatif)</span>
+          </div>
+          <div class="audio-actions">
+            <button type="button" class="btn-audio-action btn-audio-suppr" id="btnSupprimerAudio" onclick="supprimerAudio()" title="Retirer la voix" style="display: none;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+              Retirer la voix
+            </button>
+          </div>
+          <audio id="audioElement" style="display: none;"></audio>
+        </div>
+
+        <!-- 3. Choix de la Main & Réglages -->
+        <div class="card">
+          <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-4 0v5"/><path d="M14 10V4a2 2 0 0 0-4 0v6"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+            3. Main au Feutre & Vitesse
+          </h2>
+          <div class="hand-selector">
+            <div class="hand-option selected" id="optMain_femme" onclick="selectionnerMain('femme')">
+              <img id="imgThumb_femme" src="vignette-femme.webp" class="hand-preview-img" alt="Main Féminine">
+              <span>Féminine</span>
+              <span class="hand-sublabel">Claire</span>
+            </div>
+            <div class="hand-option" id="optMain_homme" onclick="selectionnerMain('homme')">
+              <img id="imgThumb_homme" src="vignette-homme.webp" class="hand-preview-img" alt="Main Masculine">
+              <span>Masculine</span>
+              <span class="hand-sublabel">Claire</span>
+            </div>
+            <div class="hand-option" id="optMain_femme_noire" onclick="selectionnerMain('femme-noire')">
+              <img id="imgThumb_femme_noire" src="vignette-femme-noire.webp" class="hand-preview-img" alt="Main Féminine Afro">
+              <span>Féminine</span>
+              <span class="hand-sublabel">Afro</span>
+            </div>
+            <div class="hand-option" id="optMain_homme_noir" onclick="selectionnerMain('homme-noir')">
+              <img id="imgThumb_homme_noir" src="vignette-homme-noir.webp" class="hand-preview-img" alt="Main Masculine Afro">
+              <span>Masculine</span>
+              <span class="hand-sublabel">Afro</span>
+            </div>
+          </div>
+
+          <!-- Réglage Taille de la main -->
+          <div class="range-slider-group">
+            <div class="range-label-row">
+              <span>Taille de la main</span>
+              <span class="range-val" id="valTailleMain">100 %</span>
+            </div>
+            <input type="range" id="rangeTailleMain" min="0.5" max="1.3" step="0.05" value="0.85" oninput="ajusterTailleMain(this.value)">
+          </div>
+
+          <!-- Réglage Vitesse du tracé -->
+          <div class="range-slider-group">
+            <div class="range-label-row">
+              <span>Vitesse de dessin</span>
+              <span class="range-val" id="valVitesse">×1,0 (normale)</span>
+            </div>
+            <input type="range" id="rangeVitesse" min="0.5" max="2.0" step="0.1" value="1.0" oninput="ajusterVitesse(this.value)">
+          </div>
+
+          <label class="checkbox-row">
+            <input type="checkbox" id="chkGauche" onchange="basculerMainGauche(this.checked)">
+            <div>
+              <strong>Main gauche</strong>
+              <span class="checkbox-subtext">La main arrive par la gauche, comme pour un gaucher.</span>
+            </div>
+          </label>
+        </div>
+
+      </aside>
+
+      <!-- Zone Scène & Tableau Blanc -->
+      <section class="stage-wrapper">
+        <div class="player-box" id="playerBox">
+          <div class="canvas-container">
+            <canvas id="mainCanvas" width="1920" height="1080" title="Double-cliquer pour basculer en plein écran"></canvas>
+            <div class="barre-objet" id="barreObjet" style="display: none;">
+              <span id="txtObjet">Objet</span>
+              <button class="btn-mini-txt" data-ordre="premier" title="Dessiner cet objet en premier">En premier</button>
+              <button class="btn-mini-txt" data-ordre="avant" title="Un rang plus tôt">◀ Plus tôt</button>
+              <button class="btn-mini-txt" data-ordre="apres" title="Un rang plus tard">Plus tard ▶</button>
+              <button class="btn-mini-txt" data-ordre="dernier" title="Dessiner cet objet en dernier">En dernier</button>
+              <button class="btn-mini-txt" id="btnOrdreAuto" title="Revenir à l'ordre automatique de cette scène">Ordre auto</button>
+              <button class="btn-mini-txt" id="btnFermerObjet" title="Fermer (Échap)">✕</button>
+            </div>
+            <div class="etat-vide" id="etatVide">
+              <strong>Le tableau est vide</strong>
+              <span>1. Glissez votre dessin dans « Dessins & Images » (une image par scène).</span>
+              <span>2. Ajoutez votre voix si vous en avez une : les scènes se caleront dessus.</span>
+              <span class="etat-vide-astuce">Astuce : en pause, cliquez sur un objet du dessin pour changer son ordre de tracé.</span>
+            </div>
+          </div>
+
+          <input type="range" id="seekBar" class="seek-bar" min="0" max="1000" step="1" value="0" aria-label="Position dans la vidéo">
+          <div class="controls-bar">
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+              <button class="btn btn-secondary" id="btnPlay" onclick="basculerLecture()" style="width: auto; padding: 0.5rem 1.25rem;">
+                ▶ Lecture
+              </button>
+              <button class="btn btn-secondary" id="btnReset" onclick="reinitialiserApercu()" style="width: auto; padding: 0.5rem 1rem;">
+                ↺ Remise à zéro
+              </button>
+            </div>
+            <div style="display: flex; gap: 0.85rem; align-items: center;">
+              <div class="timeline-info" id="timeDisplay">00:00 / 00:00</div>
+              <button class="btn btn-secondary btn-fullscreen" id="btnFullscreen" onclick="basculerPleinEcran()" title="Plein écran (Touche F)">
+                <svg id="iconFsEnter" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                <svg id="iconFsExit" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+                <span id="textFullscreen">Plein écran</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Frise chronologique des Scènes -->
+        <div class="scenes-timeline" id="scenesTimeline">
+          <div class="scenes-header">
+            <span>Frise des scènes</span>
+            <span class="timeline-info" id="syncStatus">0 scène</span>
+          </div>
+          <canvas id="friseVoix" class="frise-voix" height="64" title="Glissez une limite entre deux scènes pour changer leurs durées"></canvas>
+          <div class="scenes-track" id="scenesTrack">
+            <!-- Rendu dynamique des vignettes de scènes -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Panneau Latéral Droit : Réglages Vidéo & Exportation -->
+      <aside class="sidebar sidebar-right">
+
+        <!-- 4. Réglages Vidéo & Exportation -->
+        <div class="card">
+          <h2 class="card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            4. Réglages Vidéo
+          </h2>
+
+          <div class="options-grid">
+            <!-- Output quality -->
+            <div class="option-group">
+              <span class="option-label">Qualité de la vidéo</span>
+              <div class="pill-selector">
+                <button class="pill-btn selected" id="q1080" onclick="definirQualite('1080p')">1080p</button>
+                <button class="pill-btn" id="q720" onclick="definirQualite('720p')">720p</button>
+                <button class="pill-btn" id="q480" onclick="definirQualite('480p')">480p</button>
+              </div>
+            </div>
+
+            <!-- Video size -->
+            <div class="option-group">
+              <span class="option-label">Format</span>
+              <div class="pill-selector">
+                <button class="pill-btn" id="rAuto" onclick="definirFormat('Auto')" title="D'après la première image">Auto</button>
+                <button class="pill-btn selected" id="r169" onclick="definirFormat('16:9')">16:9 YouTube</button>
+                <button class="pill-btn" id="r916" onclick="definirFormat('9:16')">9:16 Shorts</button>
+              </div>
+            </div>
+
+            <!-- Épaisseur du trait -->
+            <div class="option-group">
+              <span class="option-label">Épaisseur du trait</span>
+              <div class="pill-selector pill-wrap" id="choixEpaisseur">
+                <button class="pill-btn selected" data-epaisseur="original" title="Les traits tels qu'ils sont dans l'image">D'origine</button>
+                <button class="pill-btn" data-epaisseur="fin">Fin</button>
+                <button class="pill-btn" data-epaisseur="moyen">Moyen</button>
+                <button class="pill-btn" data-epaisseur="epais">Épais</button>
+                <button class="pill-btn" data-epaisseur="tres-epais">Très épais</button>
+              </div>
+            </div>
+
+            <!-- Couleur du feutre -->
+            <div class="option-group">
+              <span class="option-label">Couleur du feutre</span>
+              <div class="pill-selector" id="choixCouleur">
+                <button class="pill-btn selected" data-couleur="noir"><span class="pastille" style="background:#141414"></span>Noir</button>
+                <button class="pill-btn" data-couleur="bleu"><span class="pastille" style="background:#1c4eaa"></span>Bleu</button>
+                <button class="pill-btn" data-couleur="rouge"><span class="pastille" style="background:#be2828"></span>Rouge</button>
+                <button class="pill-btn" data-couleur="vert"><span class="pastille" style="background:#1e7846"></span>Vert</button>
+              </div>
+            </div>
+
+            <!-- Fond -->
+            <div class="option-group">
+              <span class="option-label">Fond</span>
+              <div class="pill-selector" id="choixFond">
+                <button class="pill-btn selected" data-fond="blanc">Blanc</button>
+                <button class="pill-btn" data-fond="tableau" title="Photo d'un vrai tableau blanc avec son cadre">Vrai tableau</button>
+              </div>
+            </div>
+
+            <!-- Caméra -->
+            <div class="option-group">
+              <span class="option-label">Caméra</span>
+              <div class="pill-selector" id="choixCamera">
+                <button class="pill-btn selected" data-camera="fixe">Fixe</button>
+                <button class="pill-btn" data-camera="zoom" title="Zoom lent vers le dessin pendant le tracé">Zoom doux</button>
+              </div>
+              <div class="range-slider-group" id="groupeForceZoom" style="display: none; margin-top: 0.3rem;">
+                <div class="range-label-row">
+                  <span>Force du zoom</span>
+                  <span class="range-val" id="valForceZoom">×1,20</span>
+                </div>
+                <input type="range" id="rangeForceZoom" min="1.05" max="1.5" step="0.05" value="1.2" aria-label="Force du zoom doux">
+              </div>
+            </div>
+
+            <!-- Transition -->
+            <div class="option-group">
+              <span class="option-label">Entre deux scènes</span>
+              <div class="pill-selector" id="choixTransition">
+                <button class="pill-btn selected" data-transition="coupe">Coupe</button>
+                <button class="pill-btn" data-transition="effacer" title="Une brosse efface le tableau">Effacer</button>
+                <button class="pill-btn" data-transition="glisser" title="Le dessin glisse hors du tableau">Glisser</button>
+              </div>
+            </div>
+
+            <!-- Son du feutre -->
+            <div class="option-group">
+              <span class="option-label">Son du feutre</span>
+              <div class="pill-selector" id="choixSonFeutre">
+                <button class="pill-btn selected" data-son="aucun">Sans</button>
+                <button class="pill-btn" data-son="video" title="Mixé avec la voix dans le MP4">Dans la vidéo</button>
+                <button class="pill-btn" data-son="separe" title="Un fichier WAV à part, à poser sous la vidéo dans CapCut">Piste à part</button>
+              </div>
+              <div class="pill-selector" id="choixStyleFeutre" style="display: none; margin-top: 0.35rem;">
+                <button class="pill-btn" data-style="doux" title="Feutre effaçable qui glisse">Doux</button>
+                <button class="pill-btn" data-style="couine" title="Feutre qui couine sur le tableau">Qui couine</button>
+                <button class="pill-btn selected" data-style="melange" title="Surtout doux, un couinement de temps en temps">Mélange</button>
+              </div>
+              <div class="range-slider-group" id="groupeVolumeFeutre" style="display: none; margin-top: 0.3rem;">
+                <div class="range-label-row">
+                  <span>Volume du feutre</span>
+                  <span class="range-val" id="valVolumeFeutre">60 %</span>
+                </div>
+                <input type="range" id="rangeVolumeFeutre" min="0.05" max="1" step="0.05" value="0.6">
+              </div>
+              <span class="checkbox-subtext" id="aideSonFeutre" style="display: none;"></span>
+            </div>
+
+            <!-- Options cases à cocher -->
+            <label class="checkbox-row">
+              <input type="checkbox" id="chkHand" checked onchange="basculerOption('showHand', this.checked)">
+              <div>
+                <strong>Afficher la main</strong>
+                <span class="checkbox-subtext">La main est visible en train de dessiner au feutre.</span>
+              </div>
+            </label>
+
+            <label class="checkbox-row">
+              <input type="checkbox" id="chkSync" checked onchange="basculerOption('syncScenes', this.checked)">
+              <div>
+                <strong>Caler les scènes sur la voix</strong>
+                <span class="checkbox-subtext">Une scène par phrase, repérée grâce aux silences.</span>
+              </div>
+            </label>
+
+            <label class="checkbox-row">
+              <input type="checkbox" id="chkColor" onchange="basculerOption('coloredEnding', this.checked)">
+              <div>
+                <strong>Fin en couleurs</strong>
+                <span class="checkbox-subtext">Le dessin est tracé en noir, puis l'image prend ses couleurs d'origine.</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Panneau Paramètres Avancés (Dépliable avec Roue Crantée) -->
+        <div class="card advanced-card collapsed" id="cardAdvancedSettings">
+          <div class="advanced-header" onclick="basculerParametresAvances()">
+            <span class="advanced-chevron" id="chevronAdv">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </span>
+            <div class="advanced-header-info">
+              <div class="advanced-title">
+                <span>Paramètres avancés</span>
+                <svg class="advanced-gear" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+              </div>
+              <div class="advanced-subtitle">Facultatif — les paramètres par défaut conviennent à la plupart des cas</div>
+            </div>
+          </div>
+
+          <div class="advanced-body" id="bodyAdvancedSettings">
+            <!-- 1. vitesse -->
+            <div class="advanced-row">
+              <div class="advanced-labels">
+                <span class="advanced-val" id="valAdvVitesse">x1.0</span>
+                <span class="advanced-label">Vitesse du dessin</span>
+              </div>
+              <input type="range" class="advanced-slider" id="advVitesse" min="0.2" max="3.0" step="0.1" value="1.0" oninput="mettreAJourAdvVitesse(this.value)">
+            </div>
+
+            <!-- 2. Fréquence d'images (images/s) -->
+            <div class="advanced-row">
+              <div class="advanced-labels">
+                <span class="advanced-val" id="valAdvFps">25</span>
+                <span class="advanced-label">Fréquence d'images (images/s)</span>
+              </div>
+              <input type="range" class="advanced-slider" id="advFps" min="15" max="60" step="1" value="25" oninput="mettreAJourAdvFps(this.value)">
+            </div>
+
+            <!-- 3. Vitesse de détail des objets -->
+            <div class="advanced-row">
+              <div class="advanced-labels">
+                <span class="advanced-val" id="valAdvDetailSpeed">6</span>
+                <span class="advanced-label">Vitesse des petits détails</span>
+              </div>
+              <input type="range" class="advanced-slider" id="advDetailSpeed" min="1" max="20" step="1" value="6" oninput="mettreAJourAdvDetailSpeed(this.value)">
+            </div>
+
+            <!-- 4. Vitesse de fond -->
+            <div class="advanced-row">
+              <div class="advanced-labels">
+                <span class="advanced-val" id="valAdvBackgroundSpeed">12</span>
+                <span class="advanced-label">Vitesse des grands traits</span>
+              </div>
+              <input type="range" class="advanced-slider" id="advBackgroundSpeed" min="1" max="30" step="1" value="12" oninput="mettreAJourAdvBackgroundSpeed(this.value)">
+            </div>
+
+            <!-- 5. Précision de la ligne -->
+            <div class="advanced-row">
+              <div class="advanced-labels">
+                <span class="advanced-val" id="valAdvLinePrecision">3</span>
+                <span class="advanced-label">Finesse du tracé</span>
+              </div>
+              <input type="range" class="advanced-slider" id="advLinePrecision" min="1" max="10" step="1" value="3" oninput="afficherAdvLinePrecision(this.value)" onchange="mettreAJourAdvLinePrecision(this.value)">
+            </div>
+
+            <!-- 6. Durée d'affichage finale (secondes) -->
+            <div class="advanced-row">
+              <div class="advanced-labels">
+                <span class="advanced-val" id="valAdvEndDuration">2,0 secondes</span>
+                <span class="advanced-label">Pose de l'image finale</span>
+              </div>
+              <input type="range" class="advanced-slider" id="advEndDuration" min="0.5" max="10.0" step="0.5" value="2.0" oninput="mettreAJourAdvEndDuration(this.value)">
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Action Exportation -->
+        <div class="card">
+          <button class="btn btn-primary" id="btnExporter" onclick="lancerExportMP4()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span id="txtExporter">Créer la vidéo MP4</span>
+          </button>
+          <button class="btn btn-secondary" id="btnPisteFeutre" onclick="telechargerPisteFeutre()" style="display: none; margin-top: 0.5rem;">Télécharger la piste du feutre (WAV)</button>
+          <button class="btn btn-secondary" id="btnAnnulerExport" onclick="annulerExport()" style="display: none; margin-top: 0.5rem;">Annuler</button>
+          <div class="timeline-info" id="exportResume" style="margin-top: 0.5rem; text-align: center;"></div>
+          <div class="progress-container" id="exportProgress" style="display: none;">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          <div class="timeline-info" id="exportStatus" style="margin-top: 0.5rem; text-align: center;"></div>
+        </div>
+
+      </aside>
+
+    </div>
+  </main>
+
+  <script>
+    let moteur = null;
+    let mainsData = null;
+    const imagesMains = {};
+    const masquesFeutre = {};  // où se trouve le feutre sur chaque photo de main
+    let modeCourant = 'scenes';
+    let exportEnCours = null;
+    const $ = id => document.getElementById(id);
+
+    async function initialiser() {
+      window.moteur = moteur = new MoteurTableauBlanc($('mainCanvas'));
+
+      try {
+        mainsData = window.ASSETS_INTEGRES && window.ASSETS_INTEGRES.mains
+          ? window.ASSETS_INTEGRES.mains
+          : await (await fetch('mains/mains.json')).json();
+        for (const cle of ['femme', 'homme', 'femme-noire', 'homme-noir']) {
+          if (!mainsData[cle]) continue;
+          const img = await chargerImage(mainsData[cle].data_uri || ('mains/' + mainsData[cle].fichier));
+          imagesMains[cle] = img;
+          if (mainsData[cle].feutre_uri) masquesFeutre[cle] = await chargerImage(mainsData[cle].feutre_uri);
+        }
+        selectionnerMain('femme');
+      } catch (e) {
+        console.warn('Mains non chargées :', e);
+      }
+
+      configurerUploads();
+      configurerFrise();
+      configurerBarreLecture();
+      configurerEpaisseurEtSon();
+      configurerOptionsVisuelles();
+      configurerOrdreObjets();
+      $('inputProjet').onchange = async (e) => {
+        const f = e.target.files[0];
+        e.target.value = '';
+        if (f) await ouvrirProjet(f);
+      };
+      const fondT = window.ASSETS_INTEGRES && window.ASSETS_INTEGRES.fondTableau;
+      if (fondT) moteur.setFondTableau(await chargerImage(fondT.data_uri), fondT.surface);
+      SonFeutre.charger().catch(e => console.warn('Banque du feutre non chargée :', e));
+      initialiserSlidersAvances();
+      // L'appli s'ouvre vide : l'utilisateur apporte ses dessins et sa voix
+      toutRafraichir();
+    }
+
+    function chargerImage(src) {
+      return new Promise((res, rej) => {
+        const img = new Image();
+        img.onload = () => res(img);
+        img.onerror = () => rej(new Error('Image illisible'));
+        img.src = src;
+      });
+    }
+
+    function lireFichier(file, mode) {
+      return new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = ev => res(ev.target.result);
+        r.onerror = () => rej(r.error);
+        if (mode === 'texte') r.readAsText(file);
+        else if (mode === 'binaire') r.readAsArrayBuffer(file);
+        else r.readAsDataURL(file);
+      });
+    }
+
+    function afficherStatut(id, texte, accent = true) {
+      const el = $(id);
+      el.textContent = texte;
+      el.style.color = accent ? 'var(--accent)' : 'var(--text-muted)';
+    }
+
+    // --- Scènes -----------------------------------------------------------------------
+
+    async function installerScenes(scenes, libelle) {
+      arreterLecture();
+      moteur.scenes = scenes;
+      moteur.appliquerFormat();
+      afficherStatut('statusImage', 'Analyse des dessins…', false);
+      await moteur.preparerToutes((i, n) => afficherStatut('statusImage', `Analyse du dessin ${i + 1} sur ${n}…`, false));
+      afficherStatut('statusImage', libelle);
+      toutRafraichir();
+    }
+
+    // Change de mode et prépare à nouveau les dessins déjà importés (rien n'est chargé d'office)
+    async function changerMode(nouveauMode) {
+      if (nouveauMode === 'continu' && moteur.scenes.length > 1) {
+        afficherStatut('statusImage', 'Le tableau unique prend une seule image : le dessin complet.', false);
+        return;
+      }
+      changerOngletSansCharger(nouveauMode);
+      if (!moteur.scenes.length) { toutRafraichir(); return; }
+      if (nouveauMode === 'continu' && moteur.voix) moteur.scenes[0].dureeBase = moteur.voix.analyse.duree;
+      await installerScenes(moteur.scenes, nouveauMode === 'continu' ? 'Tableau unique' : `${moteur.scenes.length} scène(s)`);
+    }
+
+    function supprimerScene(idx) {
+      arreterLecture();
+      moteur.supprimerScene(idx);
+      afficherStatut('statusImage', moteur.scenes.length ? `${moteur.scenes.length} scène(s)` : 'Aucune image', moteur.scenes.length > 0);
+      toutRafraichir();
+    }
+
+    function deplacerScene(idx, direction) {
+      moteur.deplacerScene(idx, direction);
+      moteur.scenes.forEach(sc => { if (sc.prep) sc.prep.dernierS = Infinity; });
+      toutRafraichir();
+    }
+
+    function ajusterDuree(idx, delta) {
+      moteur.ajusterDuree(idx, delta);
+      $('chkSync').checked = false;
+      toutRafraichir();
+    }
+
+    function rafraichirFriseScenes() {
+      const track = $('scenesTrack');
+      track.textContent = '';
+      $('scenesTimeline').style.display = moteur.scenes.length > 1 || modeCourant === 'scenes' ? '' : 'none';
+
+      if (moteur.scenes.length === 0) {
+        const vide = document.createElement('div');
+        vide.className = 'scenes-vide';
+        vide.style.cssText = 'padding: 1.2rem; color: var(--text-muted); font-size: 0.82rem; width: 100%; text-align: center;';
+        vide.textContent = 'Tableau vide. Glissez une ou plusieurs images dans « 1. Dessins & Images ».';
+        track.appendChild(vide);
+        $('syncStatus').textContent = '0 scène';
+        return;
+      }
+
+      const debuts = moteur.debutsScenes();
+      moteur.scenes.forEach((sc, idx) => {
+        const card = document.createElement('div');
+        card.className = 'scene-card';
+        card.dataset.index = idx;
+        card.innerHTML = `
+          <div class="scene-thumb-wrap">
+            <img alt="">
+            <button class="btn-scene-del" title="Supprimer cette scène">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+          <div class="scene-title-row">
+            <span class="scene-nom"></span>
+            <div class="scene-reorder">
+              ${idx > 0 ? '<button class="btn-mini" data-dir="-1" title="Avancer cette scène">◀</button>' : ''}
+              ${idx < moteur.scenes.length - 1 ? '<button class="btn-mini" data-dir="1" title="Reculer cette scène">▶</button>' : ''}
+            </div>
+          </div>
+          <div class="scene-duration-ctrl">
+            <button class="btn-mini" data-delta="-0.1" title="Raccourcir de 0,1 s">−</button>
+            <span class="scene-dur-val">${sc.duree.toFixed(1).replace('.', ',')} s</span>
+            <button class="btn-mini" data-delta="0.1" title="Allonger de 0,1 s">+</button>
+          </div>`;
+        card.querySelector('img').src = sc.image.src;
+        card.querySelector('img').alt = sc.nom;
+        card.querySelector('.scene-nom').textContent = sc.nom;
+        card.querySelector('.scene-nom').title = 'Commence à ' + debuts[idx].toFixed(1).replace('.', ',') + ' s';
+        card.querySelector('.btn-scene-del').onclick = () => supprimerScene(idx);
+        card.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => deplacerScene(idx, +b.dataset.dir));
+        card.querySelectorAll('[data-delta]').forEach(b => b.onclick = () => ajusterDuree(idx, +b.dataset.delta));
+        card.querySelector('.scene-thumb-wrap img').onclick = () => { moteur.pauseApercu(); majBoutonLecture(); allerA(debuts[idx] + 0.01); };
+        track.appendChild(card);
+      });
+
+      const total = moteur.getDureeTotale();
+      const plan = moteur.scenes[0] && moteur.scenes[0].plan;
+      const cale = !moteur.estSynchronise() ? ''
+        : (modeCourant === 'continu' && plan && plan.length > 1 ? ` · calé phrase par phrase (${plan.length} parties)` : ' · calées sur la voix');
+      $('syncStatus').textContent = `${moteur.scenes.length} scène(s) · ${total.toFixed(1).replace('.', ',')} s${cale}`;
+    }
+
+    function toutRafraichir() {
+      const vide = moteur.scenes.length === 0;
+      $('etatVide').style.display = vide ? '' : 'none';
+      $('btnExporter').disabled = vide;
+      $('btnPlay').disabled = vide;
+      $('btnPisteFeutre').disabled = vide;
+      rafraichirFriseScenes();
+      dessinerFrise();
+      allerA(Math.min(moteur.tempsLecture, moteur.getDureeTotale()));
+      majResumeExport();
+    }
+
+    // --- Frise de la voix : forme d'onde, scènes et limites déplaçables ---------------
+
+    const friseEtat = { glisse: null };
+
+    function dessinerFrise() {
+      const cv = $('friseVoix');
+      const rect = cv.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      cv.width = Math.max(1, Math.round(rect.width * dpr));
+      cv.height = Math.round(64 * dpr);
+      const c = cv.getContext('2d');
+      c.scale(dpr, dpr);
+      const W = rect.width, H = 64;
+      c.clearRect(0, 0, W, H);
+      const total = moteur.getDureeTotale();
+      if (!total) return;
+      const xDe = t => (t / total) * W;
+      const style = getComputedStyle(document.documentElement);
+      const accent = style.getPropertyValue('--accent').trim() || '#2e5c46';
+
+      // Blocs des scènes
+      const debuts = moteur.debutsScenes();
+      moteur.scenes.forEach((sc, i) => {
+        c.fillStyle = i % 2 ? 'rgba(46, 92, 70, 0.10)' : 'rgba(46, 92, 70, 0.18)';
+        c.fillRect(xDe(debuts[i]), 0, xDe(sc.duree), H);
+        c.fillStyle = '#1f1e1c';
+        c.font = '600 11px system-ui, sans-serif';
+        c.fillText(String(i + 1), xDe(debuts[i]) + 5, 13);
+      });
+      c.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      c.fillRect(xDe(total - moteur.options.dureePoseFinale), 0, W, H);
+
+      // Forme d'onde de la voix
+      if (moteur.voix) {
+        const a = moteur.voix.analyse;
+        const env = a.enveloppe;
+        const bas = a.seuil - 20, haut = Math.max(...env);
+        c.fillStyle = '#6b6760';
+        for (let x = 0; x < xDe(a.duree); x++) {
+          const f0 = Math.floor((x / W) * total * 100), f1 = Math.floor(((x + 1) / W) * total * 100);
+          let m = -200;
+          for (let f = f0; f <= f1 && f < env.length; f++) m = Math.max(m, env[f]);
+          const k = Math.max(0, Math.min(1, (m - bas) / (haut - bas || 1)));
+          const hh = k * (H - 24) / 2;
+          c.fillRect(x, 38 - hh, 1, Math.max(1, hh * 2));
+        }
+      }
+
+      // Limites entre scènes
+      c.fillStyle = accent;
+      for (let i = 1; i < debuts.length; i++) c.fillRect(xDe(debuts[i]) - 1, 0, 3, H);
+
+      // Tête de lecture
+      c.fillStyle = '#c53030';
+      c.fillRect(xDe(moteur.tempsLecture) - 0.5, 0, 2, H);
+    }
+
+    function configurerFrise() {
+      const cv = $('friseVoix');
+      const limiteSous = (x) => {
+        const W = cv.getBoundingClientRect().width;
+        const total = moteur.getDureeTotale();
+        const debuts = moteur.debutsScenes();
+        for (let i = 1; i < debuts.length; i++) {
+          if (Math.abs((debuts[i] / total) * W - x) < 7) return i;
+        }
+        return -1;
+      };
+      const tempsSous = (x) => (x / cv.getBoundingClientRect().width) * moteur.getDureeTotale();
+
+      cv.addEventListener('pointermove', (e) => {
+        const x = e.offsetX;
+        if (friseEtat.glisse) {
+          const i = friseEtat.glisse.index;
+          const a = moteur.scenes[i - 1], b = moteur.scenes[i];
+          const debuts = moteur.debutsScenes();
+          let t = tempsSous(x);
+          // Aimant : la limite colle au début d'une phrase de la voix
+          if (moteur.voix) {
+            for (const p of moteur.voix.analyse.pauses) {
+              const cible = Math.max(p.debut, p.fin - 0.15);
+              if (Math.abs(cible - t) < 0.2) t = cible;
+            }
+          }
+          const finB = debuts[i] + b.dureeBase;
+          t = Math.max(debuts[i - 1] + 1, Math.min(finB - 1, t));
+          a.dureeBase = Math.round((t - debuts[i - 1]) * 100) / 100;
+          b.dureeBase = Math.round((finB - t) * 100) / 100;
+          moteur.options.syncScenes = false;
+          $('chkSync').checked = false;
+          moteur.recalculerDurees();
+          rafraichirFriseScenes();
+          dessinerFrise();
+          return;
+        }
+        cv.classList.toggle('poignee', limiteSous(x) > 0);
+      });
+      cv.addEventListener('pointerdown', (e) => {
+        const i = limiteSous(e.offsetX);
+        if (i > 0) {
+          friseEtat.glisse = { index: i };
+          cv.setPointerCapture(e.pointerId);
+        } else {
+          moteur.pauseApercu();
+          majBoutonLecture();
+          allerA(tempsSous(e.offsetX));
+        }
+      });
+      const finGlisse = () => {
+        if (!friseEtat.glisse) return;
+        friseEtat.glisse = null;
+        toutRafraichir();
+      };
+      cv.addEventListener('pointerup', finGlisse);
+      cv.addEventListener('pointercancel', finGlisse);
+      window.addEventListener('resize', dessinerFrise);
+    }
+
+    // --- Lecture -----------------------------------------------------------------------
+
+    function formatTemps(sec) {
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    function mettreAJourAffichageTemps(actuel, total) {
+      $('timeDisplay').textContent = formatTemps(actuel) + ' / ' + formatTemps(total);
+      const barre = $('seekBar');
+      if (!barre.matches(':active')) barre.value = total ? Math.round((actuel / total) * 1000) : 0;
+    }
+
+    let dernierDessinFrise = 0;
+    function surProgression(t, total) {
+      mettreAJourAffichageTemps(t, total);
+      const now = performance.now();
+      if (now - dernierDessinFrise > 100) { dessinerFrise(); dernierDessinFrise = now; }
+    }
+
+    function allerA(t) {
+      moteur.allerA(t);
+      const audio = $('audioElement');
+      if (audio.getAttribute('src') && audio.duration > 0) audio.currentTime = Math.min(moteur.tempsLecture, audio.duration);
+      mettreAJourAffichageTemps(moteur.tempsLecture, moteur.getDureeTotale());
+      dessinerFrise();
+    }
+
+    function configurerBarreLecture() {
+      $('seekBar').addEventListener('input', (e) => {
+        moteur.pauseApercu();
+        majBoutonLecture();
+        allerA((e.target.value / 1000) * moteur.getDureeTotale());
+      });
+    }
+
+    function majBoutonLecture() {
+      $('btnPlay').textContent = moteur.estEnLecture ? '⏸ Pause' : '▶ Lecture';
+    }
+
+    function basculerLecture() {
+      if (!moteur.scenes.length) return;
+      if (moteur.estEnLecture) {
+        moteur.pauseApercu();
+      } else {
+        moteur.demarrerApercu($('audioElement'), surProgression, () => { majBoutonLecture(); allerA(moteur.getDureeTotale()); });
+      }
+      majBoutonLecture();
+    }
+
+    function arreterLecture() {
+      if (moteur && moteur.estEnLecture) moteur.pauseApercu();
+      if (moteur) majBoutonLecture();
+    }
+
+    function reinitialiserApercu() {
+      moteur.arreterApercu();
+      majBoutonLecture();
+      allerA(0);
+    }
+
+    // --- Voix --------------------------------------------------------------------------
+
+    // srcAudio : adresse de lecture (data: URL), gardée aussi pour enregistrer le projet
+    async function installerVoix(arrayBuffer, nom, srcAudio) {
+      const audio = $('audioElement');
+      afficherStatut('statusAudio', 'Analyse de la voix…', false);
+      try {
+        const buffer = await Voix.decoder(arrayBuffer);
+        audio.src = srcAudio;
+        voixProjet = { nom, src: srcAudio };
+        moteur.setVoix(buffer);
+        if (modeCourant === 'continu' && moteur.scenes[0]) {
+          moteur.scenes[0].dureeBase = buffer.duration;
+          moteur.recalculerDurees();
+        }
+        const phrases = moteur.voix.analyse.pauses.length + 1;
+        afficherStatut('statusAudio', `${nom} · ${buffer.duration.toFixed(1).replace('.', ',')} s · ${phrases} phrase(s)`);
+        $('btnSupprimerAudio').style.display = 'inline-flex';
+      } catch (e) {
+        console.warn(e);
+        afficherStatut('statusAudio', 'Ce fichier audio ne peut pas être lu. Essayez un WAV ou un MP3.', false);
+      }
+      toutRafraichir();
+    }
+
+    function supprimerAudio() {
+      arreterLecture();
+      const audio = $('audioElement');
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      $('inputAudio').value = '';
+      moteur.setVoix(null);
+      voixProjet = null;
+      afficherStatut('statusAudio', 'Aucune voix (facultatif)', false);
+      $('btnSupprimerAudio').style.display = 'none';
+      toutRafraichir();
+    }
+
+    function configurerUploads() {
+      $('inputImage').onchange = async (e) => {
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+        files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+        const scenes = [];
+        try {
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const nom = file.name.replace(/\.[^/.]+$/, '') || `Scène ${i + 1}`;
+            const estSVG = /\.svg$/i.test(file.name) || (file.type || '').includes('svg');
+            const img = await chargerImage(await lireFichier(file, 'url'));
+            const source = estSVG ? { type: 'svg', img, svgString: await lireFichier(file, 'texte') } : { type: 'image', img };
+            scenes.push(moteur.creerScene(source, nom, 6.0));
+          }
+        } catch (err) {
+          afficherStatut('statusImage', 'Une image ne peut pas être lue : ' + err.message, false);
+          return;
+        }
+        e.target.value = '';
+        if (modeCourant === 'continu' && scenes.length > 1) changerOngletSansCharger('scenes');
+        // Une seule image avec plusieurs scènes côte à côte : une scène par zone
+        imageEntiere = null;
+        if (modeCourant === 'scenes' && scenes.length === 1 && scenes[0].source.type === 'image') {
+          const parties = await decouperEnScenes(scenes[0].source.img, scenes[0].nom);
+          if (parties.length >= 2) {
+            imageEntiere = scenes[0];
+            await installerScenes(parties, `Image découpée en ${parties.length} scènes`);
+            $('btnImageEntiere').style.display = '';
+            return;
+          }
+        }
+        $('btnImageEntiere').style.display = 'none';
+        if (moteur.voix && scenes.length === 1) scenes[0].dureeBase = moteur.voix.analyse.duree;
+        await installerScenes(scenes, `${files.length} image(s) importée(s)`);
+      };
+
+      $('inputAudio').onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        arreterLecture();
+        $('chkSync').checked = true;
+        moteur.options.syncScenes = true;
+        await installerVoix(await lireFichier(file, 'binaire'), file.name, await lireFichier(file, 'url'));
+      };
+    }
+
+    function changerOngletSansCharger(mode) {
+      modeCourant = mode;
+      moteur.mode = mode;
+      $('tabScenes').classList.toggle('active', mode === 'scenes');
+      $('tabContinu').classList.toggle('active', mode === 'continu');
+    }
+
+    // --- Main et réglages -----------------------------------------------------------
+
+    function selectionnerMain(type) {
+      document.querySelectorAll('.hand-option').forEach(el => el.classList.remove('selected'));
+      const el = $('optMain_' + type.replace(/-/g, '_'));
+      if (el) el.classList.add('selected');
+      if (mainsData && imagesMains[type]) {
+        moteur.setMain(mainsData[type], imagesMains[type], masquesFeutre[type] || null);
+        if (moteur.scenes.length) {
+          // Montrer la main sur le tableau pendant le choix
+          const t = moteur.estEnLecture ? moteur.tempsLecture : Math.max(moteur.tempsLecture, 1.2);
+          if (!moteur.estEnLecture) allerA(t);
+        }
+      }
+    }
+
+    function ajusterTailleMain(val) {
+      const v = parseFloat(val);
+      moteur.setTailleMain(v);
+      if (!moteur.estEnLecture) allerA(Math.max(moteur.tempsLecture, 1.2));
+      $('valTailleMain').textContent = Math.round((v / 0.85) * 100) + ' %';
+    }
+
+    function appliquerVitesse(v) {
+      moteur.setVitesse(v);
+      $('rangeVitesse').value = v;
+      $('advVitesse').value = v;
+      updateSliderTrack($('advVitesse'));
+      $('valAdvVitesse').textContent = '×' + v.toFixed(1).replace('.', ',');
+      const libelle = v === 1 ? ' (normale)' : (v < 1 ? ' (plus lent)' : ' (plus rapide)');
+      $('valVitesse').textContent = '×' + v.toFixed(1).replace('.', ',') + libelle;
+      toutRafraichir();
+    }
+
+    function ajusterVitesse(val) { appliquerVitesse(parseFloat(val)); }
+    function mettreAJourAdvVitesse(val) { appliquerVitesse(parseFloat(val)); }
+
+    function definirQualite(q) {
+      ['1080p', '720p', '480p'].forEach(k => $('q' + k.replace('p', '')).classList.toggle('selected', q === k));
+      moteur.setOptions({ quality: q });
+      majResumeExport();
+    }
+
+    async function definirFormat(f) {
+      arreterLecture();
+      $('rAuto').classList.toggle('selected', f === 'Auto');
+      $('r169').classList.toggle('selected', f === '16:9');
+      $('r916').classList.toggle('selected', f === '9:16');
+      afficherStatut('statusImage', 'Mise au format…', false);
+      await moteur.setFormat(f);
+      afficherStatut('statusImage', `${moteur.scenes.length} scène(s) · ${moteur.formatEffectif()}`);
+      toutRafraichir();
+    }
+
+    function basculerOption(cle, val) {
+      moteur.setOptions({ [cle]: val });
+      moteur.scenes.forEach(sc => { if (sc.prep) sc.prep.dernierS = Infinity; });
+      toutRafraichir();
+    }
+
+    function configurerEpaisseurEtSon() {
+      document.querySelectorAll('#choixEpaisseur [data-epaisseur]').forEach(b => b.onclick = async () => {
+        arreterLecture();
+        document.querySelectorAll('#choixEpaisseur .pill-btn').forEach(x => x.classList.toggle('selected', x === b));
+        afficherStatut('statusImage', 'Nouveau trait…', false);
+        await moteur.setEpaisseur(b.dataset.epaisseur);
+        afficherStatut('statusImage', `${moteur.scenes.length} scène(s) · trait ${b.textContent.toLowerCase()}`);
+        if (!moteur.estEnLecture) allerA(Math.max(moteur.tempsLecture, 2.5));
+      });
+
+      const aides = {
+        aucun: '',
+        video: 'Le bruit du feutre est mélangé à la voix dans le MP4.',
+        separe: 'Le MP4 garde seulement la voix ; la piste du feutre se télécharge à part (même durée), à poser sous la vidéo dans CapCut.'
+      };
+      document.querySelectorAll('#choixSonFeutre [data-son]').forEach(b => b.onclick = () => {
+        const mode = b.dataset.son;
+        document.querySelectorAll('#choixSonFeutre .pill-btn').forEach(x => x.classList.toggle('selected', x === b));
+        moteur.setOptions({ sonFeutre: mode });
+        $('groupeVolumeFeutre').style.display = mode === 'aucun' ? 'none' : '';
+        $('choixStyleFeutre').style.display = mode === 'aucun' ? 'none' : '';
+        $('aideSonFeutre').style.display = mode === 'aucun' ? 'none' : '';
+        $('aideSonFeutre').textContent = aides[mode];
+        $('btnPisteFeutre').style.display = mode === 'separe' ? '' : 'none';
+        if (moteur.estEnLecture) moteur.jouerFeutre(moteur.tempsLecture);
+        majResumeExport();
+      });
+
+      document.querySelectorAll('#choixStyleFeutre [data-style]').forEach(b => b.onclick = () => {
+        document.querySelectorAll('#choixStyleFeutre .pill-btn').forEach(x => x.classList.toggle('selected', x === b));
+        moteur.setOptions({ styleFeutre: b.dataset.style });
+        if (moteur.estEnLecture) moteur.jouerFeutre(moteur.tempsLecture);
+      });
+
+      $('rangeVolumeFeutre').addEventListener('input', (e) => {
+        const v = parseFloat(e.target.value);
+        moteur.setOptions({ volumeFeutre: v });
+        $('valVolumeFeutre').textContent = Math.round(v * 100) + ' %';
+        if (moteur.estEnLecture) moteur.jouerFeutre(moteur.tempsLecture);
+      });
+    }
+
+    function telechargerPisteFeutre() {
+      if (!moteur.scenes.length) return;
+      const url = URL.createObjectURL(moteur.exporterPisteFeutre());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'son-feutre.wav';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+
+    function majResumeExport() {
+      if (!moteur.scenes.length) {
+        $('exportResume').textContent = 'Importez un dessin pour créer la vidéo.';
+        return;
+      }
+      const { w, h } = moteur.tailleExport();
+      const total = moteur.getDureeTotale();
+      const feutre = moteur.options.sonFeutre === 'video';
+      const voix = moteur.voix ? (feutre ? 'voix + feutre' : 'avec la voix') : (feutre ? 'feutre seul' : 'sans son');
+      $('exportResume').textContent = `${w}×${h} · ${moteur.options.fps} images/s · ${total.toFixed(1).replace('.', ',')} s · ${voix}`;
+    }
+
+    // --- Paramètres avancés --------------------------------------------------------------
+
+    function basculerParametresAvances() {
+      $('cardAdvancedSettings').classList.toggle('collapsed');
+      initialiserSlidersAvances();
+    }
+
+    function updateSliderTrack(slider) {
+      if (!slider) return;
+      const min = parseFloat(slider.min) || 0;
+      const max = parseFloat(slider.max) || 100;
+      const pct = Math.max(0, Math.min(100, ((parseFloat(slider.value) - min) / (max - min)) * 100));
+      slider.style.background = `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, #e2e8f0 ${pct}%, #e2e8f0 100%)`;
+    }
+
+    function mettreAJourAdvFps(val) {
+      $('valAdvFps').textContent = val;
+      moteur.setFPS(val);
+      updateSliderTrack($('advFps'));
+      majResumeExport();
+    }
+
+    function mettreAJourAdvDetailSpeed(val) {
+      $('valAdvDetailSpeed').textContent = val;
+      moteur.setVitesseDetail(val);
+      updateSliderTrack($('advDetailSpeed'));
+      toutRafraichir();
+    }
+
+    function mettreAJourAdvBackgroundSpeed(val) {
+      $('valAdvBackgroundSpeed').textContent = val;
+      moteur.setVitesseFond(val);
+      updateSliderTrack($('advBackgroundSpeed'));
+      toutRafraichir();
+    }
+
+    function afficherAdvLinePrecision(val) {
+      $('valAdvLinePrecision').textContent = val;
+      updateSliderTrack($('advLinePrecision'));
+    }
+
+    // Relance l'analyse une seule fois, quand on lâche le curseur
+    async function mettreAJourAdvLinePrecision(val) {
+      afficherAdvLinePrecision(val);
+      arreterLecture();
+      afficherStatut('statusImage', 'Nouvelle analyse des dessins…', false);
+      await moteur.setPrecisionLigne(val);
+      afficherStatut('statusImage', `${moteur.scenes.length} scène(s) prête(s)`);
+      toutRafraichir();
+    }
+
+    function mettreAJourAdvEndDuration(val) {
+      const d = parseFloat(val);
+      $('valAdvEndDuration').textContent = d.toFixed(1).replace('.', ',') + ' s';
+      moteur.setDureePoseFinale(d);
+      updateSliderTrack($('advEndDuration'));
+      toutRafraichir();
+    }
+
+    function initialiserSlidersAvances() {
+      ['advVitesse', 'advFps', 'advDetailSpeed', 'advBackgroundSpeed', 'advLinePrecision', 'advEndDuration']
+        .forEach(id => updateSliderTrack($(id)));
+    }
+
+    // --- Plein écran et clavier ------------------------------------------------------------
+
+    function basculerPleinEcran() {
+      const box = $('playerBox');
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        (box.requestFullscreen ? box.requestFullscreen() : box.webkitRequestFullscreen());
+      } else {
+        (document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen());
+      }
+    }
+
+    function onChangementPleinEcran() {
+      const plein = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      $('iconFsEnter').style.display = plein ? 'none' : 'inline-block';
+      $('iconFsExit').style.display = plein ? 'inline-block' : 'none';
+      $('textFullscreen').textContent = plein ? 'Quitter le plein écran' : 'Plein écran';
+      setTimeout(dessinerFrise, 50);
+    }
+
+    document.addEventListener('fullscreenchange', onChangementPleinEcran);
+    document.addEventListener('webkitfullscreenchange', onChangementPleinEcran);
+
+    document.addEventListener('keydown', (e) => {
+      const tag = e.target.tagName;
+      if (tag === 'INPUT' && e.target.type !== 'range' && e.target.type !== 'checkbox') return;
+      if (tag === 'TEXTAREA') return;
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        basculerPleinEcran();
+      } else if (e.code === 'Space') {
+        // Évite que la barre d'espace active aussi le bouton qui a le focus
+        e.preventDefault();
+        if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+        basculerLecture();
+      } else if (e.key === 'Escape' && objetChoisi) {
+        choisirObjet(null);
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        if (tag === 'INPUT') return;
+        e.preventDefault();
+        moteur.pauseApercu();
+        majBoutonLecture();
+        allerA(moteur.tempsLecture + (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 0.1 : 1));
+      }
+    });
+
+    // --- Export ------------------------------------------------------------------------------
+
+    function annulerExport() {
+      if (exportEnCours) exportEnCours.abort();
+    }
+
+    async function lancerExportMP4() {
+      if (!moteur.scenes.length) return;
+      arreterLecture();
+      const btn = $('btnExporter');
+      const pBox = $('exportProgress');
+      const pBar = $('progressBar');
+      const sTxt = $('exportStatus');
+      const { w, h } = moteur.tailleExport();
+
+      btn.disabled = true;
+      $('btnAnnulerExport').style.display = '';
+      pBox.style.display = 'block';
+      pBar.style.width = '0%';
+      sTxt.textContent = `Création de la vidéo ${w}×${h}…`;
+      exportEnCours = new AbortController();
+      const debut = performance.now();
+
+      try {
+        const blob = await moteur.exporterMP4((ratio) => {
+          const pct = Math.round(ratio * 100);
+          pBar.style.width = pct + '%';
+          const ecoule = (performance.now() - debut) / 1000;
+          const reste = ratio > 0.05 ? Math.max(0, ecoule / ratio - ecoule) : null;
+          sTxt.textContent = `Création de la vidéo : ${pct} %` + (reste !== null ? ` · encore ${Math.ceil(reste)} s` : '');
+        }, exportEnCours.signal);
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'animation-tableau-blanc.mp4';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        const mo = (blob.size / 1048576).toFixed(1).replace('.', ',');
+        sTxt.textContent = `Vidéo prête (${mo} Mo) : regardez dans vos téléchargements.`;
+      } catch (err) {
+        pBar.style.width = '0%';
+        sTxt.textContent = err.name === 'AbortError' ? 'Export annulé.' : 'L\'export a échoué : ' + err.message;
+      } finally {
+        btn.disabled = false;
+        $('btnAnnulerExport').style.display = 'none';
+        exportEnCours = null;
+        allerA(moteur.tempsLecture);
+      }
+    }
+
+    // --- Découpage d'une image en scènes -----------------------------------------------
+
+    let imageEntiere = null;  // l'image importée avant découpage (pour revenir en arrière)
+
+    async function decouperEnScenes(img, nom) {
+      const k = Math.min(1, 2400 / img.width);
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k);
+      c.height = Math.round(img.height * k);
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      moteur.blanchirFond(ctx, c.width, c.height);
+      retirerCadre(ctx, c.width, c.height);
+      const zones = Vectoriseur.detecterZones(c);
+      if (zones.length < 2) return [];
+      const marge = Math.round(c.width * 0.02);
+      const parties = [];
+      for (let i = 0; i < zones.length; i++) {
+        // Coupe nette sur la zone (les bouts de flèche entre deux scènes restent dehors),
+        // puis une marge blanche autour
+        const z = zones[i];
+        const x0 = z.x0, x1 = z.x1 + 1;
+        const y0 = Math.max(0, z.y0 - 2), y1 = Math.min(c.height, z.y1 + 3);
+        const p = document.createElement('canvas');
+        p.width = x1 - x0 + marge * 2;
+        p.height = y1 - y0 + marge * 2;
+        const pctx = p.getContext('2d');
+        pctx.fillStyle = '#ffffff';
+        pctx.fillRect(0, 0, p.width, p.height);
+        pctx.drawImage(c, x0, y0, x1 - x0, y1 - y0, marge, marge, x1 - x0, y1 - y0);
+        effacerMorceauxCoupes(pctx, p.width, p.height, marge, p.width - marge - 1);
+        const partie = await chargerImage(p.toDataURL('image/png'));
+        parties.push(moteur.creerScene({ type: 'image', img: partie }, `${nom} · ${i + 1}`, 6.0));
+      }
+      return parties;
+    }
+
+    // Petit morceau d'encre coupé par le bord gauche ou droit de la découpe (bout d'une flèche qui
+    // relie deux scènes) : on l'efface, il n'appartient pas à la scène
+    function effacerMorceauxCoupes(ctx, w, h, bordG, bordD) {
+      const img = ctx.getImageData(0, 0, w, h);
+      const d = img.data;
+      const vu = new Uint8Array(w * h);
+      const encre = p => { const i = p * 4; return 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 200; };
+      const file = new Int32Array(w * h);
+      for (const x of [bordG, bordD]) {
+        for (let y = 0; y < h; y++) {
+          const depart = y * w + x;
+          if (vu[depart] || !encre(depart)) continue;
+          let tete = 0, queue = 0, x0 = w, x1 = 0, y0 = h, y1 = 0;
+          file[queue++] = depart;
+          vu[depart] = 1;
+          while (tete < queue) {
+            const p = file[tete++];
+            const px = p % w, py = (p - px) / w;
+            x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
+            for (const q of [p - 1, p + 1, p - w, p + w]) {
+              if (q < 0 || q >= w * h || vu[q] || !encre(q)) continue;
+              if (Math.abs((q % w) - px) > 1) continue;
+              vu[q] = 1;
+              file[queue++] = q;
+            }
+          }
+          if (x1 - x0 < w * 0.12 && y1 - y0 < h * 0.12) {
+            for (let k = 0; k < queue; k++) {
+              const i = file[k] * 4;
+              d[i] = d[i + 1] = d[i + 2] = 255;
+            }
+          }
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+    }
+
+    // Cadre de tableau dessiné autour de toute l'image : une ligne sombre continue près de chaque
+    // bord. S'il y en a un, tout ce qui est à l'extérieur (cadre compris) est blanchi.
+    function retirerCadre(ctx, w, h) {
+      const d = ctx.getImageData(0, 0, w, h).data;
+      const sombre = (x, y) => { const i = (y * w + x) * 4; return 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 160; };
+      // Proportion de pixels sombres sur une ligne ou une colonne
+      const ligne = y => { let n = 0; for (let x = 0; x < w; x += 2) n += sombre(x, y); return n / Math.ceil(w / 2); };
+      const colonne = x => { let n = 0; for (let y = 0; y < h; y += 2) n += sombre(x, y); return n / Math.ceil(h / 2); };
+      const chercher = (debut, fin, pas, mesure) => {
+        for (let v = debut; v !== fin; v += pas) {
+          if (mesure(v) > 0.7) {
+            let u = v;
+            while (u !== fin && mesure(u) > 0.3) u += pas;  // traverser l'épaisseur du cadre
+            return u + pas * 3;
+          }
+        }
+        return null;
+      };
+      const haut = chercher(0, Math.round(h * 0.15), 1, ligne);
+      const bas = chercher(h - 1, Math.round(h * 0.85), -1, ligne);
+      const gauche = chercher(0, Math.round(w * 0.15), 1, colonne);
+      const droite = chercher(w - 1, Math.round(w * 0.85), -1, colonne);
+      if (haut === null || bas === null || gauche === null || droite === null) return;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, haut);
+      ctx.fillRect(0, bas, w, h - bas);
+      ctx.fillRect(0, 0, gauche, h);
+      ctx.fillRect(droite, 0, w - droite, h);
+    }
+
+    async function garderImageEntiere() {
+      if (!imageEntiere) return;
+      $('btnImageEntiere').style.display = 'none';
+      const sc = imageEntiere;
+      imageEntiere = null;
+      if (moteur.voix) sc.dureeBase = moteur.voix.analyse.duree;
+      await installerScenes([sc], 'Image entière (1 scène)');
+    }
+
+    // --- Couleur, fond, caméra, transition, main gauche -------------------------------
+
+    function choixPilules(id, attribut, surChoix) {
+      document.querySelectorAll(`#${id} [data-${attribut}]`).forEach(b => b.onclick = async () => {
+        document.querySelectorAll(`#${id} .pill-btn`).forEach(x => x.classList.toggle('selected', x === b));
+        await surChoix(b.dataset[attribut]);
+      });
+    }
+
+    function marquerPilule(id, attribut, valeur) {
+      document.querySelectorAll(`#${id} [data-${attribut}]`).forEach(x => x.classList.toggle('selected', x.dataset[attribut] === valeur));
+    }
+
+    function configurerOptionsVisuelles() {
+      choixPilules('choixCouleur', 'couleur', async (c) => {
+        arreterLecture();
+        await moteur.setCouleurFeutre(c);
+        if (!moteur.estEnLecture) allerA(Math.max(moteur.tempsLecture, 2.5));
+      });
+      choixPilules('choixFond', 'fond', async (f) => {
+        arreterLecture();
+        afficherStatut('statusImage', 'Mise en place sur le tableau…', false);
+        await moteur.setFond(f);
+        afficherStatut('statusImage', `${moteur.scenes.length} scène(s) · fond ${f === 'tableau' ? 'vrai tableau' : 'blanc'}`, moteur.scenes.length > 0);
+        toutRafraichir();
+      });
+      choixPilules('choixCamera', 'camera', (c) => {
+        moteur.setOptions({ camera: c });
+        $('groupeForceZoom').style.display = c === 'zoom' ? '' : 'none';
+        toutRafraichir();
+      });
+      // Force du zoom : on montre tout de suite l'image la plus zoomée de la scène affichée
+      $('rangeForceZoom').addEventListener('input', (e) => {
+        const z = parseFloat(e.target.value);
+        moteur.setOptions({ forceZoom: z });
+        $('valForceZoom').textContent = '×' + z.toFixed(2).replace('.', ',');
+        if (!moteur.estEnLecture && moteur.scenes.length) {
+          const pos = moteur.sceneA(moteur.tempsLecture);
+          const fin = pos && pos.sc.plan ? pos.sc.plan[pos.sc.plan.length - 1].t1 : 0;
+          allerA(moteur.debutsScenes()[pos.index] + Math.max(0, fin - 0.05));
+        }
+      });
+      choixPilules('choixTransition', 'transition', (t) => { moteur.setOptions({ transition: t }); toutRafraichir(); });
+    }
+
+    function basculerMainGauche(gauche) {
+      moteur.setOptions({ mainGauche: gauche });
+      if (!moteur.estEnLecture) allerA(Math.max(moteur.tempsLecture, 1.2));
+    }
+
+    // --- Ordre des objets, à la souris --------------------------------------------------
+
+    let objetChoisi = null;
+
+    // Point cliqué sur le tableau, en pixels du dessin (tient compte du cadrage et de la caméra)
+    function pointTableau(ev) {
+      const cv = $('mainCanvas');
+      const r = cv.getBoundingClientRect();
+      const W = moteur.largeur, H = moteur.hauteur;
+      const k = Math.min(r.width / W, r.height / H);
+      const ox = (r.width - W * k) / 2, oy = (r.height - H * k) / 2;
+      let x = (ev.clientX - r.left - ox) / k, y = (ev.clientY - r.top - oy) / k;
+      if (moteur.options.camera !== 'fixe') {
+        const cam = moteur.cadrageCamera(moteur.tempsLecture);
+        x = cam.x + x * cam.w / W;
+        y = cam.y + y * cam.h / H;
+      }
+      return { x, y };
+    }
+
+    function choisirObjet(choix) {
+      objetChoisi = choix;
+      moteur.selection = choix ? { scId: choix.sc.id, objet: choix.objet } : null;
+      $('barreObjet').style.display = choix ? '' : 'none';
+      if (choix) $('txtObjet').textContent = `Objet ${choix.rang + 1} sur ${choix.nombre}`;
+      moteur.allerA(moteur.tempsLecture);
+    }
+
+    function configurerOrdreObjets() {
+      $('mainCanvas').addEventListener('click', (ev) => {
+        if (moteur.estEnLecture || !moteur.scenes.length) return;
+        const p = pointTableau(ev);
+        choisirObjet(moteur.objetSous(p.x, p.y));
+      });
+      document.querySelectorAll('#barreObjet [data-ordre]').forEach(b => b.onclick = () => {
+        if (!objetChoisi) return;
+        moteur.deplacerObjet(objetChoisi.sc, objetChoisi.objet, b.dataset.ordre);
+        const ordre = moteur.ordreObjetsActuel(objetChoisi.sc);
+        choisirObjet({ ...objetChoisi, rang: ordre.indexOf(objetChoisi.objet), nombre: ordre.length });
+        toutRafraichir();
+      });
+      $('btnOrdreAuto').onclick = () => {
+        if (!objetChoisi) return;
+        moteur.reinitialiserOrdre(objetChoisi.sc);
+        choisirObjet(null);
+        toutRafraichir();
+      };
+      $('btnFermerObjet').onclick = () => choisirObjet(null);
+    }
+
+    // --- Projet : enregistrer et ouvrir ----------------------------------------------------
+
+    let voixProjet = null;  // { nom, src } de la voix chargée
+
+    function enregistrerProjet() {
+      if (!moteur.scenes.length) {
+        afficherStatut('statusImage', 'Rien à enregistrer : importez d\'abord un dessin.', false);
+        return;
+      }
+      const o = moteur.options;
+      const projet = {
+        type: 'tableau-blanc-ia',
+        version: 1,
+        mode: modeCourant,
+        main: document.querySelector('.hand-option.selected')?.id.replace('optMain_', '').replace(/_/g, '-') || 'femme',
+        options: {
+          format: o.format, quality: o.quality, showHand: o.showHand, coloredEnding: o.coloredEnding,
+          syncScenes: o.syncScenes, vitesse: o.vitesse, fps: o.fps, vitesseDetail: o.vitesseDetail,
+          vitesseFond: o.vitesseFond, precisionLigne: o.precisionLigne, tailleMain: o.tailleMain,
+          dureePoseFinale: o.dureePoseFinale, epaisseur: o.epaisseur, sonFeutre: o.sonFeutre,
+          volumeFeutre: o.volumeFeutre, styleFeutre: o.styleFeutre, camera: o.camera, fond: o.fond,
+          transition: o.transition, couleurFeutre: o.couleurFeutre, mainGauche: o.mainGauche, forceZoom: o.forceZoom
+        },
+        scenes: moteur.scenes.map(sc => ({
+          nom: sc.nom,
+          type: sc.source.type,
+          image: sc.source.img.src,
+          svg: sc.source.svgString || null,
+          dureeBase: sc.dureeBase,
+          ordreObjets: sc.ordreObjets || null
+        })),
+        voix: voixProjet
+      };
+      const url = URL.createObjectURL(new Blob([JSON.stringify(projet)], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'mon-projet.tableau.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+
+    async function ouvrirProjet(file) {
+      let projet;
+      try {
+        projet = JSON.parse(await lireFichier(file, 'texte'));
+        if (projet.type !== 'tableau-blanc-ia') throw new Error('ce n\'est pas un projet Tableau Blanc IA');
+      } catch (e) {
+        afficherStatut('statusImage', 'Projet illisible : ' + e.message, false);
+        return;
+      }
+      arreterLecture();
+      choisirObjet(null);
+      Object.assign(moteur.options, projet.options || {});
+      if (moteur.options.camera === 'suivre') moteur.options.camera = 'zoom';
+      changerOngletSansCharger(projet.mode === 'continu' ? 'continu' : 'scenes');
+      majControles(projet);
+      if (projet.main) selectionnerMain(projet.main);
+
+      if (projet.voix && projet.voix.src) {
+        const binaire = await (await fetch(projet.voix.src)).arrayBuffer();
+        await installerVoix(binaire, projet.voix.nom, projet.voix.src);
+      } else {
+        supprimerAudio();
+      }
+      const scenes = [];
+      for (const s of projet.scenes || []) {
+        const img = await chargerImage(s.image);
+        const sc = moteur.creerScene(s.type === 'svg' ? { type: 'svg', img, svgString: s.svg } : { type: 'image', img }, s.nom, s.dureeBase);
+        sc.ordreObjets = s.ordreObjets;
+        scenes.push(sc);
+      }
+      moteur.options.syncScenes = !!(projet.options && projet.options.syncScenes);
+      $('btnImageEntiere').style.display = 'none';
+      await installerScenes(scenes, `Projet ouvert : ${scenes.length} scène(s)`);
+    }
+
+    // Remet les boutons et curseurs dans l'état des réglages du projet
+    function majControles(projet) {
+      const o = moteur.options;
+      definirQualite(o.quality);
+      $('rAuto').classList.toggle('selected', o.format === 'Auto');
+      $('r169').classList.toggle('selected', o.format === '16:9');
+      $('r916').classList.toggle('selected', o.format === '9:16');
+      marquerPilule('choixEpaisseur', 'epaisseur', o.epaisseur);
+      marquerPilule('choixCouleur', 'couleur', o.couleurFeutre);
+      marquerPilule('choixFond', 'fond', o.fond);
+      marquerPilule('choixCamera', 'camera', o.camera);
+      $('groupeForceZoom').style.display = o.camera === 'zoom' ? '' : 'none';
+      $('rangeForceZoom').value = o.forceZoom;
+      $('valForceZoom').textContent = '×' + o.forceZoom.toFixed(2).replace('.', ',');
+      marquerPilule('choixTransition', 'transition', o.transition);
+      marquerPilule('choixStyleFeutre', 'style', o.styleFeutre);
+      const btnSon = document.querySelector(`#choixSonFeutre [data-son="${o.sonFeutre}"]`);
+      if (btnSon) btnSon.click();
+      $('rangeVolumeFeutre').value = o.volumeFeutre;
+      $('valVolumeFeutre').textContent = Math.round(o.volumeFeutre * 100) + ' %';
+      $('chkHand').checked = o.showHand;
+      $('chkSync').checked = o.syncScenes;
+      $('chkColor').checked = o.coloredEnding;
+      $('chkGauche').checked = o.mainGauche;
+      $('rangeTailleMain').value = o.tailleMain;
+      $('valTailleMain').textContent = Math.round((o.tailleMain / 0.85) * 100) + ' %';
+      $('advFps').value = o.fps; $('valAdvFps').textContent = o.fps;
+      $('advDetailSpeed').value = o.vitesseDetail; $('valAdvDetailSpeed').textContent = o.vitesseDetail;
+      $('advBackgroundSpeed').value = o.vitesseFond; $('valAdvBackgroundSpeed').textContent = o.vitesseFond;
+      $('advLinePrecision').value = o.precisionLigne; $('valAdvLinePrecision').textContent = o.precisionLigne;
+      $('advEndDuration').value = o.dureePoseFinale;
+      $('valAdvEndDuration').textContent = o.dureePoseFinale.toFixed(1).replace('.', ',') + ' s';
+      $('rangeVitesse').value = o.vitesse;
+      $('advVitesse').value = o.vitesse;
+      $('valVitesse').textContent = '×' + o.vitesse.toFixed(1).replace('.', ',');
+      $('valAdvVitesse').textContent = '×' + o.vitesse.toFixed(1).replace('.', ',');
+      initialiserSlidersAvances();
+      moteur.appliquerFormat();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      $('mainCanvas').addEventListener('dblclick', basculerPleinEcran);
+      initialiser();
+    });
+  </script>
+</body>
+</html>
