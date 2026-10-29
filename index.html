@@ -1273,7 +1273,17 @@
         pctx.fillStyle = '#ffffff';
         pctx.fillRect(0, 0, p.width, p.height);
         pctx.drawImage(c, x0, y0, x1 - x0, y1 - y0, marge, marge, x1 - x0, y1 - y0);
-        effacerMorceauxCoupes(pctx, p.width, p.height, marge, p.width - marge - 1);
+        // Un morceau n'est « coupé » que si de l'encre continue de l'autre côté du bord de la découpe
+        // (sinon c'est un vrai bout du dessin, par exemple le dernier chiffre d'une heure)
+        const encreAuBord = (xc) => {
+          if (xc < 0 || xc >= c.width) return false;
+          const col = c.getContext('2d', { willReadFrequently: true }).getImageData(xc, y0, 1, Math.max(1, y1 - y0)).data;
+          for (let k = 0; k < col.length; k += 4) if (0.299 * col[k] + 0.587 * col[k + 1] + 0.114 * col[k + 2] < 200) return true;
+          return false;
+        };
+        effacerMorceauxCoupes(pctx, p.width, p.height,
+          encreAuBord(x0 - 1) ? marge : -1,
+          encreAuBord(x1) ? p.width - marge - 1 : -1);
         const partie = await chargerImage(p.toDataURL('image/png'));
         parties.push(moteur.creerScene({ type: 'image', img: partie }, `${nom} · ${i + 1}`, 6.0));
       }
@@ -1289,6 +1299,7 @@
       const encre = p => { const i = p * 4; return 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 200; };
       const file = new Int32Array(w * h);
       for (const x of [bordG, bordD]) {
+        if (x < 0) continue;
         for (let y = 0; y < h; y++) {
           const depart = y * w + x;
           if (vu[depart] || !encre(depart)) continue;
