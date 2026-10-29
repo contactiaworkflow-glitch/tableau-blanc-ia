@@ -75,9 +75,9 @@
             2. Voix / Narration
           </h2>
           <div class="drop-zone" id="dropAudio">
-            <input type="file" id="inputAudio" accept="audio/*,.wav,.mp3,.m4a">
+            <input type="file" id="inputAudio" accept="audio/*,.wav,.mp3,.m4a" multiple>
             <strong>Glissez la voix ici</strong>
-            <div class="drop-hint">WAV, MP3 ou M4A — facultatif. Les scènes se calent toutes seules sur les phrases.</div>
+            <div class="drop-hint">WAV, MP3 ou M4A — facultatif. Les scènes se calent toutes seules sur les phrases. Une voix par scène ? Glissez-les toutes ensemble : elles sont assemblées dans l'ordre de leur nom.</div>
             <span class="file-status" id="statusAudio" style="color: var(--text-muted);">Aucune voix (facultatif)</span>
           </div>
           <div class="audio-actions">
@@ -880,13 +880,73 @@
       };
 
       $('inputAudio').onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
         arreterLecture();
         $('chkSync').checked = true;
         moteur.options.syncScenes = true;
-        await installerVoix(await lireFichier(file, 'binaire'), file.name, await lireFichier(file, 'url'));
+        if (files.length === 1) {
+          const file = files[0];
+          await installerVoix(await lireFichier(file, 'binaire'), file.name, await lireFichier(file, 'url'));
+          return;
+        }
+        // Plusieurs fichiers (une voix par scène) : assemblés dans l'ordre de leur nom
+        files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+        afficherStatut('statusAudio', `Assemblage de ${files.length} voix…`, false);
+        try {
+          const wav = await assemblerVoix(files, 1.0);
+          const blob = new Blob([wav], { type: 'audio/wav' });
+          await installerVoix(wav, `${files.length} voix assemblées`, await lireFichier(blob, 'url'));
+        } catch (err) {
+          console.warn(err);
+          afficherStatut('statusAudio', 'Ces fichiers audio ne peuvent pas être assemblés. Essayez des WAV ou des MP3.', false);
+        }
       };
+    }
+
+    // Assemble des voix (une par scène) en un seul WAV mono : silences de début et de fin retirés,
+    // puis une pause d'exactement `pause` secondes entre deux voix (c'est elle qui sert à caler les scènes)
+    async function assemblerVoix(fichiers, pause) {
+      const morceaux = [];
+      let sr = 0;
+      for (const f of fichiers) {
+        const buf = await Voix.decoder(await lireFichier(f, 'binaire'));
+        const a = Voix.analyser(buf);
+        sr = sr || buf.sampleRate;
+        const mono = new Float32Array(buf.length);
+        for (let c = 0; c < buf.numberOfChannels; c++) {
+          const ch = buf.getChannelData(c);
+          for (let i = 0; i < buf.length; i++) mono[i] += ch[i] / buf.numberOfChannels;
+        }
+        let donnees = mono.subarray(
+          Math.floor(Math.max(0, a.debutParole - 0.05) * buf.sampleRate),
+          Math.min(buf.length, Math.ceil((a.finParole + 0.15) * buf.sampleRate)));
+        if (buf.sampleRate !== sr) {   // même fréquence pour tous (interpolation simple)
+          const k = buf.sampleRate / sr;
+          const sortie = new Float32Array(Math.floor(donnees.length / k));
+          for (let i = 0; i < sortie.length; i++) {
+            const p = i * k, i0 = Math.floor(p), i1 = Math.min(donnees.length - 1, i0 + 1);
+            sortie[i] = donnees[i0] + (donnees[i1] - donnees[i0]) * (p - i0);
+          }
+          donnees = sortie;
+        }
+        morceaux.push(donnees);
+      }
+      const silence = Math.round(pause * sr);
+      const total = morceaux.reduce((n, m) => n + m.length, 0) + silence * (morceaux.length - 1);
+      const wav = new ArrayBuffer(44 + total * 2);
+      const v = new DataView(wav);
+      const texte = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+      texte(0, 'RIFF'); v.setUint32(4, 36 + total * 2, true); texte(8, 'WAVE'); texte(12, 'fmt ');
+      v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+      texte(36, 'data'); v.setUint32(40, total * 2, true);
+      let pos = 44;
+      morceaux.forEach((m, k) => {
+        for (let i = 0; i < m.length; i++, pos += 2) v.setInt16(pos, Math.max(-1, Math.min(1, m[i])) * 32767, true);
+        if (k < morceaux.length - 1) pos += silence * 2;   // le WAV est déjà à zéro : silence
+      });
+      return wav;
     }
 
     function changerOngletSansCharger(mode) {
