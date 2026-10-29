@@ -1195,6 +1195,7 @@
       ctx.drawImage(img, 0, 0, c.width, c.height);
       moteur.blanchirFond(ctx, c.width, c.height);
       retirerCadre(ctx, c.width, c.height);
+      retirerSeparateurs(ctx, c.width, c.height);
       const zones = Vectoriseur.detecterZones(c);
       if (zones.length < 2) return [];
       const marge = Math.round(c.width * 0.02);
@@ -1284,6 +1285,56 @@
       ctx.fillRect(0, bas, w, h - bas);
       ctx.fillRect(0, 0, gauche, h);
       ctx.fillRect(droite, 0, w - droite, h);
+    }
+
+    // Trait vertical qui traverse presque toute la hauteur (séparation que l'IA dessine parfois
+    // entre deux scènes) : il n'appartient à aucune scène, on le blanchit avant le découpage.
+    function retirerSeparateurs(ctx, w, h) {
+      const img = ctx.getImageData(0, 0, w, h);
+      const d = img.data;
+      const sombre = (x, y) => { const i = (y * w + x) * 4; return 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 170; };
+      // Un trait tracé à la main ondule d'un pixel : on regarde une fenêtre de 5 colonnes, et on
+      // compte les lignes de l'image où elle contient de l'encre
+      // Hauteur du dessin : du premier au dernier rang qui contient de l'encre
+      let haut = -1, bas = -1;
+      for (let y = 0; y < h && bas < 0; y++) {
+        for (let x = 0; x < w; x++) if (sombre(x, y)) { haut = y; break; }
+        if (haut >= 0) break;
+      }
+      for (let y = h - 1; y >= 0; y--) {
+        let encre = false;
+        for (let x = 0; x < w; x++) if (sombre(x, y)) { encre = true; break; }
+        if (encre) { bas = y; break; }
+      }
+      if (haut < 0 || bas - haut < h * 0.3) return;
+      const marque = new Uint8Array(w);
+      for (let x = 2; x < w - 2; x++) {
+        let lignes = 0;
+        for (let y = haut; y <= bas; y++) {
+          if (sombre(x - 2, y) || sombre(x - 1, y) || sombre(x, y) || sombre(x + 1, y) || sombre(x + 2, y)) lignes++;
+        }
+        if (lignes >= (bas - haut + 1) * 0.85) marque[x] = 1;
+      }
+      const largeurMax = Math.max(6, Math.round(w * 0.03));
+      let x = 0, retire = false;
+      while (x < w) {
+        if (!marque[x]) { x++; continue; }
+        let fin = x;
+        while (fin + 1 < w && marque[fin + 1]) fin++;
+        // Seulement un trait fin : un grand aplat noir n'est pas un séparateur
+        if (fin - x + 1 <= largeurMax) {
+          const a = Math.max(0, x - 3), b = Math.min(w - 1, fin + 3);
+          for (let xx = a; xx <= b; xx++) {
+            for (let y = 0; y < h; y++) {
+              const i = (y * w + xx) * 4;
+              d[i] = d[i + 1] = d[i + 2] = 255;
+            }
+          }
+          retire = true;
+        }
+        x = fin + 1;
+      }
+      if (retire) ctx.putImageData(img, 0, 0);
     }
 
     async function garderImageEntiere() {
