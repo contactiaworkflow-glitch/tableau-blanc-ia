@@ -1053,3 +1053,38 @@ input[type="range"] {
   color: var(--accent);
   font-weight: 600;
 }
+
+/* Petits écrans (téléphone) : en-tête repliable, colonne qui ne déborde pas */
+@media (max-width: 640px) {
+  .app-header {
+    padding: 0.9rem 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .brand {
+    flex-wrap: wrap;
+  }
+  .header-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .header-actions .badge-info {
+    flex-basis: 100%;
+  }
+  .main-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sidebar,
+  .sidebar-right {
+    min-width: 0;
+  }
+  .controls-bar {
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+  .container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
